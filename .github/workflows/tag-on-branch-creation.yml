@@ -1,0 +1,45 @@
+name: Tag on Branch Creation
+
+on:
+  create:
+
+jobs:
+  tag-release:
+    if: github.ref_type == 'branch' && (startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/hotfix/'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email ""EDMDevops" <EDMDevops@ncl.com>"
+
+      - name: Fetch all tags
+        run: git fetch --tags
+
+
+      - name: Check if tag with branch name exists
+        id: check_tag
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          TAG_NAME="${BRANCH_NAME//\//_}_Start"
+          TAG_EXISTS=$(git tag -l "$TAG_NAME")
+          if [ -z "$TAG_EXISTS" ]; then
+            echo "Creating Tag: $TAG_NAME"
+            echo "::notice::Creating Tag: $TAG_NAME"
+            echo "tag_needed=true" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          else
+            echo "::notice::Tag already exists: $TAG_NAME"
+            echo "Tag already exists: $TAG_NAME"
+            echo "tag_needed=false" >> $GITHUB_OUTPUT
+            echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push lightweight tag
+        if: steps.check_tag.outputs.tag_needed == 'true'
+        run: |
+          git tag "${{ steps.check_tag.outputs.tag_name }}"
+          git push origin "${{ steps.check_tag.outputs.tag_name }}"
